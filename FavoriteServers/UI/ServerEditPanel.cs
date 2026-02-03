@@ -26,9 +26,25 @@ namespace FavoriteServers.UI
         private bool _isVisible;
         private List<string> _availableCharacters = new List<string>();
         private Button _saveButton;
+        private Button _showInMainMenuToggle;
+        private Text _showInMainMenuText;
+        private bool _showInMainMenu;
+        private GameObject _colorRow;
+        private string _selectedColor = "#FFFFFF";
+        private List<Image> _colorSwatchImages = new List<Image>();
+
+        private static readonly string[] ColorPresets = {
+            "#B0FFB0", // Green
+            "#B0D0FF", // Blue
+            "#FFD080", // Gold
+            "#FF9090", // Red
+            "#FFB0C0", // Pink
+            "#D0B0FF", // Purple
+            "#FFFFFF"  // White
+        };
 
         private const float PanelWidth = 450f;
-        private const float PanelHeight = 370f; // Increased for character dropdown
+        private const float PanelHeight = 460f;
 
         private Selectable[] _tabSelectables; // For tab navigation (inputs, dropdown, save button)
 
@@ -216,7 +232,7 @@ namespace FavoriteServers.UI
             CreateLabel("Port:", yOffset);
             _portInput = CreateInputField(yOffset, 80f);
             _portInput.contentType = InputField.ContentType.IntegerNumber;
-            _portInput.text = "2456";
+            _portInput.placeholder.GetComponent<Text>().text = "2456";
             yOffset -= rowHeight;
 
             // Password field
@@ -229,6 +245,111 @@ namespace FavoriteServers.UI
             // Character dropdown
             CreateLabel("Character:", yOffset);
             _characterDropdown = CreateDropdown(yOffset, inputWidth);
+            yOffset -= rowHeight;
+
+            // Show in Main Menu toggle
+            var toggleBtn = GUIManager.Instance.CreateButton(
+                "[ ] Show in Main Menu",
+                _panel.transform,
+                new Vector2(1f, 1f),
+                new Vector2(1f, 1f),
+                new Vector2(-25f - inputWidth / 2f, yOffset),
+                inputWidth,
+                30f
+            );
+            _showInMainMenuToggle = toggleBtn.GetComponent<Button>();
+            _showInMainMenuText = toggleBtn.GetComponentInChildren<Text>();
+            if (_showInMainMenuText == null)
+            {
+                var tmp = toggleBtn.GetComponentInChildren<TMPro.TextMeshProUGUI>();
+                if (tmp != null)
+                {
+                    tmp.alignment = TMPro.TextAlignmentOptions.Left;
+                    tmp.margin = new Vector4(10f, 0f, 0f, 0f);
+                }
+            }
+            else
+            {
+                _showInMainMenuText.alignment = TextAnchor.MiddleLeft;
+                var textRect = _showInMainMenuText.GetComponent<RectTransform>();
+                if (textRect != null)
+                {
+                    textRect.offsetMin = new Vector2(textRect.offsetMin.x + 10f, textRect.offsetMin.y);
+                }
+            }
+            _showInMainMenuToggle.onClick.AddListener(() =>
+            {
+                _showInMainMenu = !_showInMainMenu;
+                UpdateToggleText();
+                UpdateColorRowVisibility();
+            });
+            yOffset -= rowHeight;
+
+            // Color swatch row (only visible when Show in Main Menu is checked)
+            _colorRow = new GameObject("ColorRow");
+            _colorRow.transform.SetParent(_panel.transform, false);
+            var colorRowRect = _colorRow.AddComponent<RectTransform>();
+            colorRowRect.anchorMin = new Vector2(1f, 1f);
+            colorRowRect.anchorMax = new Vector2(1f, 1f);
+            colorRowRect.pivot = new Vector2(1f, 0.5f);
+            colorRowRect.anchoredPosition = new Vector2(-25f, yOffset);
+            colorRowRect.sizeDelta = new Vector2(inputWidth, 30f);
+
+            // Create label for color row (parented to _colorRow so it hides with it)
+            var colorLabelGO = GUIManager.Instance.CreateText(
+                "Color:",
+                _colorRow.transform,
+                new Vector2(0f, 0.5f),
+                new Vector2(0f, 0.5f),
+                new Vector2(-55f, 0f),
+                GUIManager.Instance.AveriaSerifBold,
+                14,
+                Color.white,
+                true,
+                Color.black,
+                90f,
+                30f,
+                false
+            );
+            colorLabelGO.GetComponent<Text>().alignment = TextAnchor.MiddleRight;
+
+            // Create color swatch buttons
+            float swatchSize = 30f;
+            float swatchSpacing = 8f;
+            float totalSwatchWidth = ColorPresets.Length * swatchSize + (ColorPresets.Length - 1) * swatchSpacing;
+            float swatchStartX = (inputWidth - totalSwatchWidth) / 2f;
+
+            _colorSwatchImages.Clear();
+            for (int i = 0; i < ColorPresets.Length; i++)
+            {
+                var colorHex = ColorPresets[i];
+                ColorUtility.TryParseHtmlString(colorHex, out Color swatchColor);
+
+                var swatchGO = new GameObject($"ColorSwatch_{i}");
+                swatchGO.transform.SetParent(_colorRow.transform, false);
+
+                var swatchRect = swatchGO.AddComponent<RectTransform>();
+                swatchRect.anchorMin = new Vector2(0f, 0.5f);
+                swatchRect.anchorMax = new Vector2(0f, 0.5f);
+                swatchRect.pivot = new Vector2(0f, 0.5f);
+                swatchRect.anchoredPosition = new Vector2(swatchStartX + i * (swatchSize + swatchSpacing), 0f);
+                swatchRect.sizeDelta = new Vector2(swatchSize, swatchSize);
+
+                var swatchImage = swatchGO.AddComponent<Image>();
+                swatchImage.color = swatchColor;
+                _colorSwatchImages.Add(swatchImage);
+
+                var swatchButton = swatchGO.AddComponent<Button>();
+                swatchButton.targetGraphic = swatchImage;
+                var capturedHex = colorHex;
+                swatchButton.onClick.AddListener(() =>
+                {
+                    _selectedColor = capturedHex;
+                    UpdateSwatchHighlights();
+                });
+            }
+
+            _colorRow.SetActive(false);
             yOffset -= rowHeight;
 
             // Error text
@@ -406,13 +527,63 @@ namespace FavoriteServers.UI
             return "";
         }
 
+        private void UpdateColorRowVisibility()
+        {
+            if (_colorRow != null)
+            {
+                _colorRow.SetActive(_showInMainMenu);
+            }
+        }
+
+        private void UpdateSwatchHighlights()
+        {
+            for (int i = 0; i < ColorPresets.Length && i < _colorSwatchImages.Count; i++)
+            {
+                ColorUtility.TryParseHtmlString(ColorPresets[i], out Color baseColor);
+                bool selected = ColorPresets[i] == _selectedColor;
+                _colorSwatchImages[i].color = baseColor;
+
+                // Remove old outline, add new one if selected
+                var outline = _colorSwatchImages[i].GetComponent<Outline>();
+                if (selected && outline == null)
+                {
+                    outline = _colorSwatchImages[i].gameObject.AddComponent<Outline>();
+                    outline.effectColor = GUIManager.Instance.ValheimOrange;
+                    outline.effectDistance = new Vector2(2f, 2f);
+                }
+                else if (!selected && outline != null)
+                {
+                    Destroy(outline);
+                }
+            }
+        }
+
+        private void UpdateToggleText()
+        {
+            var label = _showInMainMenu ? "[x] Show in Main Menu" : "[ ] Show in Main Menu";
+            if (_showInMainMenuText != null)
+            {
+                _showInMainMenuText.text = label;
+            }
+            else
+            {
+                var tmp = _showInMainMenuToggle?.GetComponentInChildren<TMPro.TextMeshProUGUI>();
+                if (tmp != null) tmp.text = label;
+            }
+        }
+
         private void ClearInputs()
         {
             if (_nameInput != null) _nameInput.text = "";
             if (_hostnameInput != null) _hostnameInput.text = "";
-            if (_portInput != null) _portInput.text = "2456";
+            if (_portInput != null) _portInput.text = "";
             if (_passwordInput != null) _passwordInput.text = "";
             SetSelectedCharacter("");
+            _showInMainMenu = false;
+            _selectedColor = "#FFFFFF";
+            UpdateToggleText();
+            UpdateColorRowVisibility();
+            UpdateSwatchHighlights();
         }
 
         private void PopulateInputs(ServerEntry server)
@@ -422,6 +593,11 @@ namespace FavoriteServers.UI
             if (_portInput != null) _portInput.text = server.Port.ToString();
             if (_passwordInput != null) _passwordInput.text = server.Password ?? "";
             SetSelectedCharacter(server.CharacterName);
+            _showInMainMenu = server.ShowInMainMenu;
+            _selectedColor = server.MenuColor ?? "#FFFFFF";
+            UpdateToggleText();
+            UpdateColorRowVisibility();
+            UpdateSwatchHighlights();
         }
 
         private void ClearError()
@@ -439,7 +615,8 @@ namespace FavoriteServers.UI
             // Validate
             var name = _nameInput?.text?.Trim() ?? "";
             var hostname = _hostnameInput?.text?.Trim() ?? "";
-            var portText = _portInput?.text?.Trim() ?? "2456";
+            var portText = _portInput?.text?.Trim();
+            if (string.IsNullOrEmpty(portText)) portText = "2456";
             var password = _passwordInput?.text ?? "";
             var characterName = GetSelectedCharacter();
 
@@ -469,12 +646,14 @@ namespace FavoriteServers.UI
                 _editingServer.Port = port;
                 _editingServer.Password = password;
                 _editingServer.CharacterName = characterName;
+                _editingServer.ShowInMainMenu = _showInMainMenu;
+                _editingServer.MenuColor = _selectedColor;
                 ServerManager.UpdateServer(_editingServer);
             }
             else
             {
                 // Create new
-                var server = new ServerEntry(name, hostname, port, password, characterName);
+                var server = new ServerEntry(name, hostname, port, password, characterName, _showInMainMenu, _selectedColor);
                 ServerManager.AddServer(server);
             }
 

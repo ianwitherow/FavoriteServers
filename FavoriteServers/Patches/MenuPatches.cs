@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using HarmonyLib;
 using UnityEngine;
@@ -14,6 +15,8 @@ namespace FavoriteServers.Patches
     public static class MenuPatches
     {
         private static GameObject _favoritesButton;
+        private static List<GameObject> _quickConnectButtons = new List<GameObject>();
+        private static Button _templateButton;
 
         /// <summary>
         /// Add Favorites button when the main menu loads
@@ -167,12 +170,108 @@ namespace FavoriteServers.Patches
                 });
 
                 _favoritesButton.SetActive(true);
+                _templateButton = templateButton;
                 FavoriteServersPlugin.Log.LogInfo("Favorites button added to main menu!");
+
+                // Add quick-connect buttons for pinned servers
+                AddQuickConnectButtons();
+
+                // Listen for server changes to refresh buttons
+                ServerManager.OnServersChanged -= RefreshQuickConnectButtons;
+                ServerManager.OnServersChanged += RefreshQuickConnectButtons;
             }
             catch (System.Exception ex)
             {
                 FavoriteServersPlugin.Log.LogError($"Failed to add Favorites button: {ex.Message}\n{ex.StackTrace}");
             }
+        }
+
+        private static void AddQuickConnectButtons()
+        {
+            var servers = ServerManager.GetMainMenuServers();
+            if (servers.Count == 0 || _favoritesButton == null || _templateButton == null) return;
+
+            var favRect = _favoritesButton.GetComponent<RectTransform>();
+            float yStep = 40f;
+
+            for (int i = 0; i < servers.Count; i++)
+            {
+                var server = servers[i];
+
+                var btnGO = Object.Instantiate(_templateButton.gameObject, _templateButton.transform.parent);
+                btnGO.name = $"QuickConnect_{server.Id}";
+
+                // Remove extra MonoBehaviours (same cleanup as favorites button)
+                var componentsToRemove = btnGO.GetComponents<MonoBehaviour>();
+                foreach (var comp in componentsToRemove)
+                {
+                    if (!(comp is Button) && !(comp is Image) && !(comp is Selectable))
+                    {
+                        var typeName = comp.GetType().Name;
+                        if (typeName != "Button" && typeName != "Image")
+                        {
+                            Object.Destroy(comp);
+                        }
+                    }
+                }
+
+                // Position below the favorites button
+                var rect = btnGO.GetComponent<RectTransform>();
+                if (rect != null && favRect != null)
+                {
+                    rect.anchoredPosition = favRect.anchoredPosition - new Vector2(0, yStep * (i + 1));
+                }
+
+                // Set sibling index after favorites button
+                btnGO.transform.SetSiblingIndex(_favoritesButton.transform.GetSiblingIndex() + i + 1);
+
+                // Update text, applying color only if non-default
+                var menuColor = server.MenuColor ?? "#FFFFFF";
+                var displayName = menuColor == "#FFFFFF"
+                    ? server.Name
+                    : $"<color={menuColor}>{server.Name}</color>";
+                var tmpText = btnGO.GetComponentInChildren<TextMeshProUGUI>(true);
+                if (tmpText != null)
+                {
+                    tmpText.text = displayName;
+                }
+                else
+                {
+                    var legacyText = btnGO.GetComponentInChildren<Text>(true);
+                    if (legacyText != null)
+                    {
+                        legacyText.text = server.Name;
+                    }
+                }
+
+                // Wire click handler
+                var button = btnGO.GetComponent<Button>();
+                button.onClick = new Button.ButtonClickedEvent();
+                var capturedServer = server;
+                button.onClick.AddListener(() =>
+                {
+                    FavoriteServersPlugin.Log.LogInfo($"Quick-connect to {capturedServer.Name}");
+                    ConnectionManager.ConnectToServer(capturedServer);
+                });
+
+                btnGO.SetActive(true);
+                _quickConnectButtons.Add(btnGO);
+            }
+
+            FavoriteServersPlugin.Log.LogInfo($"Added {servers.Count} quick-connect button(s) to main menu");
+        }
+
+        private static void RefreshQuickConnectButtons()
+        {
+            // Destroy existing quick-connect buttons
+            foreach (var btn in _quickConnectButtons)
+            {
+                if (btn != null) Object.Destroy(btn);
+            }
+            _quickConnectButtons.Clear();
+
+            // Recreate them
+            AddQuickConnectButtons();
         }
 
         /// <summary>
@@ -194,6 +293,9 @@ namespace FavoriteServers.Patches
         public static void FejdStartup_OnDestroy_Prefix()
         {
             _favoritesButton = null;
+            _templateButton = null;
+            _quickConnectButtons.Clear();
+            ServerManager.OnServersChanged -= RefreshQuickConnectButtons;
         }
 
         /// <summary>

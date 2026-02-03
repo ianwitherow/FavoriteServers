@@ -37,6 +37,10 @@ namespace FavoriteServers.UI
 
         private void OnDestroy()
         {
+            if (_panel != null)
+            {
+                SaveWindowPosition();
+            }
             ServerManager.OnServersChanged -= RefreshServerList;
         }
 
@@ -65,6 +69,7 @@ namespace FavoriteServers.UI
         {
             if (_panel != null)
             {
+                SaveWindowPosition();
                 _panel.SetActive(false);
             }
             _isVisible = false;
@@ -84,6 +89,14 @@ namespace FavoriteServers.UI
         }
 
         public bool IsVisible => _isVisible;
+
+        private void SaveWindowPosition()
+        {
+            var rect = _panel.GetComponent<RectTransform>();
+            FavoriteServersPlugin.WindowPosX.Value = rect.position.x;
+            FavoriteServersPlugin.WindowPosY.Value = rect.position.y;
+            FavoriteServersPlugin.Instance.Config.Save();
+        }
 
         private void CreatePanel()
         {

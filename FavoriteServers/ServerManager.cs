@@ -18,13 +18,15 @@ namespace FavoriteServers
         public int Port = 2456;
         public string Password;
         public string CharacterName; // Optional - auto-select this character when connecting
+        public bool ShowInMainMenu; // Show a quick-connect button on the main menu
+        public string MenuColor = "#FFFFFF"; // Color for the main menu button text
 
         public ServerEntry()
         {
             Id = Guid.NewGuid().ToString();
         }
 
-        public ServerEntry(string name, string hostname, int port = 2456, string password = "", string characterName = "")
+        public ServerEntry(string name, string hostname, int port = 2456, string password = "", string characterName = "", bool showInMainMenu = false, string menuColor = "#FFFFFF")
         {
             Id = Guid.NewGuid().ToString();
             Name = name;
@@ -32,6 +34,8 @@ namespace FavoriteServers
             Port = port;
             Password = password ?? "";
             CharacterName = characterName ?? "";
+            ShowInMainMenu = showInMainMenu;
+            MenuColor = menuColor ?? "#B0FFB0";
         }
 
         public string GetDisplayAddress()
@@ -181,6 +185,11 @@ namespace FavoriteServers
             return _servers;
         }
 
+        public static List<ServerEntry> GetMainMenuServers()
+        {
+            return _servers.Where(s => s.ShowInMainMenu).ToList();
+        }
+
         public static ServerEntry GetServer(string id)
         {
             return _servers.Find(s => s.Id == id);
@@ -244,7 +253,9 @@ namespace FavoriteServers
                             Hostname = parts[2],
                             Port = int.TryParse(parts[3], out int port) ? port : 2456,
                             Password = parts.Length > 4 ? parts[4] : "",
-                            CharacterName = parts.Length > 5 ? parts[5] : ""
+                            CharacterName = parts.Length > 5 ? parts[5] : "",
+                            ShowInMainMenu = parts.Length > 6 && bool.TryParse(parts[6], out bool show) && show,
+                            MenuColor = parts.Length > 7 && !string.IsNullOrEmpty(parts[7]) ? parts[7] : "#FFFFFF"
                         };
                         _servers.Add(server);
                     }
@@ -264,7 +275,7 @@ namespace FavoriteServers
             try
             {
                 var sb = new StringBuilder();
-                sb.AppendLine("# FavoriteServers config - format: id|name|hostname|port|password|characterName");
+                sb.AppendLine("# FavoriteServers config - format: id|name|hostname|port|password|characterName|showInMainMenu|menuColor");
 
                 foreach (var server in _servers)
                 {
@@ -274,7 +285,7 @@ namespace FavoriteServers
                     var password = (server.Password ?? "").Replace("|", "\\|");
                     var characterName = (server.CharacterName ?? "").Replace("|", "\\|");
 
-                    sb.AppendLine($"{server.Id}|{name}|{hostname}|{server.Port}|{password}|{characterName}");
+                    sb.AppendLine($"{server.Id}|{name}|{hostname}|{server.Port}|{password}|{characterName}|{server.ShowInMainMenu}|{server.MenuColor}");
                 }
 
                 File.WriteAllText(_configPath, sb.ToString());
