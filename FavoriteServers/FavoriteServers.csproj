@@ -1,0 +1,70 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>FavoriteServers</AssemblyName>
+    <RootNamespace>FavoriteServers</RootNamespace>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+
+  <!-- Set your Valheim install path here -->
+  <PropertyGroup>
+    <ValheimPath>C:\Program Files (x86)\Steam\steamapps\common\Valheim</ValheimPath>
+    <BepInExPath>$(ValheimPath)\BepInEx</BepInExPath>
+    <ManagedPath>$(ValheimPath)\valheim_Data\Managed</ManagedPath>
+  </PropertyGroup>
+
+  <!-- BepInEx and Jotunn references -->
+  <ItemGroup>
+    <PackageReference Include="BepInEx.Core" Version="5.4.*" />
+    <PackageReference Include="JotunnLib" Version="2.27.*" />
+  </ItemGroup>
+
+  <!-- Valheim Assembly References -->
+  <ItemGroup>
+    <Reference Include="assembly_valheim">
+      <HintPath>$(ManagedPath)\assembly_valheim.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="assembly_utils">
+      <HintPath>$(ManagedPath)\assembly_utils.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Unity References -->
+  <ItemGroup>
+    <Reference Include="UnityEngine">
+      <HintPath>$(ManagedPath)\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(ManagedPath)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(ManagedPath)\UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>$(ManagedPath)\UnityEngine.UIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(ManagedPath)\UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>$(ManagedPath)\Unity.TextMeshPro.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Copy to plugins folder on build -->
+  <Target Name="CopyToPlugins" AfterTargets="Build" Condition="Exists('$(BepInExPath)')">
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(BepInExPath)\plugins" />
+  </Target>
+
+</Project>
